@@ -27,8 +27,8 @@ def _settings(db, **auto):
     s = db.get(Settings, 1)
     at = dict(s.auto_trading)
     # Widen the trading session so these tests are deterministic at any run time.
-    at.setdefault("session_start", "00:00")
-    at.setdefault("session_end", "23:59")
+    at["session_start"] = "00:00"
+    at["session_end"] = "23:59"
     at.update(auto)
     s.auto_trading = at
     db.commit()

@@ -21,6 +21,45 @@
     </div>
 
     <div id="integrations" class="banner"></div>
+
+    <div class="section-title"><h2>API Credentials &amp; Connections</h2></div>
+    <div class="card" style="margin-bottom:14px">
+      <p class="muted" style="margin-top:0;font-size:12px">
+        Stored encrypted on the server and never shown again in full. Leave a field blank to keep its
+        current value. Rotate the Dhan <strong>Access Token</strong> here whenever it expires (~24h) —
+        no restart needed.
+      </p>
+      <div class="form-grid">
+        <div class="field">
+          <label>Dhan Client ID <span id="st_dhan_client_id" class="muted"></span></label>
+          <input id="c_dhan_client_id" placeholder="e.g. 1100xxxxxx (fixed)" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Dhan Access Token <span id="st_dhan_access_token" class="muted"></span></label>
+          <input id="c_dhan_access_token" type="password" placeholder="changes every ~24h" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>OpenAI API Key <span id="st_openai_api_key" class="muted"></span></label>
+          <input id="c_openai_api_key" type="password" placeholder="sk-... (fixed)" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>OpenAI Model <span id="st_openai_model" class="muted"></span></label>
+          <input id="c_openai_model" placeholder="e.g. gpt-4o-mini" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>News API Key (optional) <span id="st_news_api_key" class="muted"></span></label>
+          <input id="c_news_api_key" type="password" placeholder="optional" autocomplete="off" />
+        </div>
+      </div>
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn primary" onclick="saveCredentials()">Save Credentials</button>
+        <button class="btn" onclick="testDhan()">Test Dhan Connection</button>
+        <button class="btn" onclick="testOpenAI()">Test OpenAI Connection</button>
+      </div>
+      <div id="test-dhan" class="banner" style="display:none"></div>
+      <div id="test-openai" class="banner" style="display:none"></div>
+    </div>
+
     <div class="banner warn">Live auto-trading and MTF are OFF by default. Enabling LIVE execution
       (paper trading off) requires <code>live_confirmed: true</code> and is enforced by the backend.</div>
 
@@ -93,10 +132,76 @@ async function loadSettings() {
     'Integrations — Dhan: ' + badge(ints.dhan) + ' · OpenAI: ' + badge(ints.openai) + ' · News: ' + badge(ints.news) +
     ' <span class="muted">(configure keys in .env; secrets never shown here)</span>';
   render();
+  loadCredentials();
   loadAudit();
   refreshStatbar();
 }
 function badge(ok){ return ok ? '<span class="pill ok">configured</span>' : '<span class="pill off">not set</span>'; }
+
+const CRED_KEYS = ['dhan_client_id','dhan_access_token','openai_api_key','openai_model','news_api_key'];
+
+async function loadCredentials() {
+  const r = await api('/api/credentials');
+  if (!r || r._unauth) return;
+  const creds = r.credentials || {};
+  for (const k of CRED_KEYS) {
+    const c = creds[k] || {};
+    const el = document.getElementById('st_' + k);
+    if (!el) continue;
+    if (c.configured) {
+      const src = c.source === 'database' ? 'saved' : (c.source === 'env' ? 'from .env' : '');
+      el.innerHTML = '<span class="pill ok">' + (c.preview || 'set') + '</span> ' +
+        '<span class="muted" style="font-size:11px">' + src + '</span>';
+    } else {
+      el.innerHTML = '<span class="pill off">not set</span>';
+    }
+  }
+}
+
+async function saveCredentials() {
+  const body = {};
+  for (const k of CRED_KEYS) {
+    const v = document.getElementById('c_' + k).value.trim();
+    if (v) body[k] = v;           // only send fields the user actually filled in
+  }
+  if (!Object.keys(body).length) { toast('Nothing to save (all fields blank)'); return; }
+  const r = await api('/api/credentials', { method: 'PUT', body: JSON.stringify(body) });
+  if (r) {
+    for (const k of CRED_KEYS) document.getElementById('c_' + k).value = '';  // clear inputs
+    toast('Credentials saved: ' + (r.changed || []).join(', '));
+    loadCredentials();
+    refreshStatbar();
+  }
+}
+
+function showTest(id, provider, res) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  if (res.ok) {
+    el.className = 'banner'; el.style.borderColor = 'var(--buy)';
+    el.innerHTML = '<span class="pill ok">' + provider + ' CONNECTED</span> ' +
+      (res.model ? '<span class="muted">model ' + res.model + '</span>' : '');
+  } else if (res.offline || res.configured === false) {
+    el.className = 'banner warn';
+    el.innerHTML = '<span class="pill off">' + provider + ' NOT CONFIGURED</span> ' +
+      '<span class="muted">' + (res.detail || '') + '</span>';
+  } else {
+    el.className = 'banner danger';
+    el.innerHTML = '<span class="pill bad">' + provider + ' FAILED</span> ' +
+      '<span class="muted">' + (res.detail || res.status || 'connection error') + '</span>';
+  }
+}
+
+async function testDhan() {
+  toast('Testing Dhan...');
+  const r = await api('/api/credentials/test/dhan', { method: 'POST' });
+  if (r && !r._unauth) showTest('test-dhan', 'Dhan', r);
+}
+async function testOpenAI() {
+  toast('Testing OpenAI...');
+  const r = await api('/api/credentials/test/openai', { method: 'POST' });
+  if (r && !r._unauth) showTest('test-openai', 'OpenAI', r);
+}
 
 function showLogin(){ document.getElementById('login-box').style.display='block'; document.getElementById('panel').style.display='none'; }
 

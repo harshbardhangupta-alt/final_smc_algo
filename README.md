@@ -100,9 +100,21 @@ uvicorn app.main:app --reload
 
 ## Configuration
 
-Runtime **secrets** live in `.env` (never committed). Everything an admin tunes at
-runtime (universe, capital/risk, scheduling, scoring, auto-trading, news policy)
-lives in the database and is edited on the **Settings** page.
+You can supply API credentials **two ways**, and the in-app option takes precedence:
+
+1. **From the website (recommended)** — open **Settings → API Credentials & Connections**,
+   sign in as admin, and enter your **Dhan Client ID** (fixed), **Dhan Access Token**
+   (rotate here whenever it expires — Dhan expires it every ~24h, no restart needed),
+   **OpenAI API Key** (fixed) and optional **OpenAI model** / **News API key**. Values are
+   **encrypted at rest** (Fernet, keyed from `SECRET_KEY`) and are never shown again in
+   full — only a masked preview (e.g. `••••7654`). Blank fields keep the existing value, so
+   rotating just the access token is one field + Save. Two **Test Connection** buttons make a
+   real call to Dhan and OpenAI and report **CONNECTED / FAILED / NOT CONFIGURED**.
+2. **From `.env`** — set the same keys as environment variables (see `.env.example`). Useful
+   for headless/CI deployments. Any credential saved in the UI overrides the `.env` value.
+
+Everything else an admin tunes at runtime (universe, capital/risk, scheduling, scoring,
+auto-trading, news policy) also lives in the database and is edited on the **Settings** page.
 
 Important `.env` keys (see `.env.example` for all):
 

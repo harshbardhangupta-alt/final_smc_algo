@@ -64,9 +64,12 @@ def run_scan(
     candle_fetcher: CandleFetcher | None = None,
 ) -> ScanRun:
     settings = _get_settings(db)
-    dhan = dhan or DhanClient()
-    researcher = researcher or OpenAIResearcher()
-    news = news or NewsProvider()
+    # Resolve credentials from DB (admin-managed) merged over the environment.
+    from .credentials import resolve_config
+    resolved = resolve_config(db)
+    dhan = dhan or DhanClient(resolved)
+    researcher = researcher or OpenAIResearcher(resolved)
+    news = news or NewsProvider(resolved)
     fundamentals = fundamentals or FundamentalsProvider()
     fetch = candle_fetcher or default_candle_fetcher(dhan)
 

@@ -21,6 +21,9 @@ APScheduler>=3.10,<4
 # Auth (password hashing for backend controls)
 bcrypt>=4.1
 
+# Encryption at rest for admin-managed API credentials (Fernet)
+cryptography>=42.0
+
 # Optional production DB driver (uncomment / install when using PostgreSQL)
 # psycopg[binary]>=3.1
 

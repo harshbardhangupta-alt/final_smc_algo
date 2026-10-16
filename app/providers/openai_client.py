@@ -59,6 +59,27 @@ class OpenAIResearcher:
     def configured(self) -> bool:
         return self.config.openai_configured
 
+    def test_connection(self) -> dict:
+        """Lightweight live check that the OpenAI key + model actually work."""
+        if not self.configured:
+            return {"ok": False, "configured": False, "detail": "OpenAI API key not set"}
+        url = f"{self.config.openai_api_base}/chat/completions"
+        headers = {"Authorization": f"Bearer {self.config.openai_api_key}"}
+        body = {
+            "model": self.config.openai_model,
+            "max_tokens": 5,
+            "messages": [{"role": "user", "content": "Reply with the single word: OK"}],
+        }
+        try:
+            with httpx.Client(timeout=self.config.openai_timeout_seconds) as client:
+                resp = client.post(url, headers=headers, json=body)
+            if resp.status_code == 200:
+                return {"ok": True, "configured": True, "model": self.config.openai_model}
+            detail = resp.text[:200]
+            return {"ok": False, "configured": True, "status": resp.status_code, "detail": detail}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "configured": True, "detail": f"request failed: {exc}"}
+
     def assess(self, symbol: str, direction: str, evidence: dict) -> ResearchAssessment:
         """Assess news + fundamentals for a candidate.
 

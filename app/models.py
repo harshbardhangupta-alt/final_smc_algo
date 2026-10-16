@@ -187,3 +187,20 @@ class AuditLog(Base):
     actor: Mapped[str] = mapped_column(String(64), default="system")
     action: Mapped[str] = mapped_column(String(64))
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class Secret(Base):
+    """Encrypted credential storage (admin-managed from the UI).
+
+    Values are stored encrypted at rest (Fernet, keyed from SECRET_KEY) and are
+    NEVER returned to the browser in plaintext — only masked previews and
+    presence flags. DB-stored secrets override the corresponding ``.env`` value.
+    """
+
+    __tablename__ = "secrets"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value_encrypted: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )

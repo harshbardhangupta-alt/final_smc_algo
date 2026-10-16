@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import get_config
 from ..database import get_db
 from ..providers.dhan import DhanClient
+from ..services.credentials import resolve_config
 
 router = APIRouter(prefix="/api", tags=["health"])
 
@@ -21,18 +22,19 @@ def health(db: Session = Depends(get_db)) -> dict:
         db.execute(text("SELECT 1"))
     except Exception:  # noqa: BLE001
         db_ok = False
+    resolved = resolve_config(db)  # env + DB-stored credentials
     return {
         "status": "ok" if db_ok else "degraded",
         "env": cfg.app_env,
         "database": "ok" if db_ok else "error",
         "integrations": {
-            "dhan": cfg.dhan_configured,
-            "openai": cfg.openai_configured,
-            "news": cfg.news_configured,
+            "dhan": resolved.dhan_configured,
+            "openai": resolved.openai_configured,
+            "news": resolved.news_configured,
         },
     }
 
 
 @router.get("/health/broker")
-def broker_health() -> dict:
-    return DhanClient().health_check()
+def broker_health(db: Session = Depends(get_db)) -> dict:
+    return DhanClient(resolve_config(db)).health_check()

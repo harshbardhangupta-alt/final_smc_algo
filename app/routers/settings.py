@@ -5,10 +5,15 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from pydantic import BaseModel
+
 from ..config import get_config
 from ..database import get_db
 from ..models import AuditLog, Settings, User
+from ..providers.dhan import DhanClient
+from ..providers.openai_client import OpenAIResearcher
 from ..schemas import LoginRequest, SettingsOut, SettingsUpdate
+from ..services import credentials
 from ..security import (
     clear_session_cookie,
     current_user,
@@ -45,15 +50,15 @@ def me(user: User = Depends(current_user)) -> dict:
 @router.get("/settings", response_model=SettingsOut)
 def get_settings(db: Session = Depends(get_db), _: User = Depends(require_admin)) -> SettingsOut:
     s = _require_settings(db)
-    cfg = get_config()
+    resolved = credentials.resolve_config(db)  # env + DB-stored credentials
     return SettingsOut(
         universe=s.universe, capital=s.capital, auto_trading=s.auto_trading,
         scheduling=s.scheduling, scoring=s.scoring, policy=s.policy,
         updated_at=s.updated_at,
         integrations={
-            "dhan": cfg.dhan_configured,
-            "openai": cfg.openai_configured,
-            "news": cfg.news_configured,
+            "dhan": resolved.dhan_configured,
+            "openai": resolved.openai_configured,
+            "news": resolved.news_configured,
         },
     )
 
@@ -91,6 +96,52 @@ def _guard_auto_trading(group: str, current: dict, incoming: dict) -> None:
             status.HTTP_400_BAD_REQUEST,
             "Enabling LIVE auto-trading requires 'live_confirmed': true in the request.",
         )
+
+
+class CredentialsUpdate(BaseModel):
+    dhan_client_id: str | None = None
+    dhan_access_token: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str | None = None
+    news_api_key: str | None = None
+
+
+@router.get("/credentials")
+def get_credentials(db: Session = Depends(get_db), _: User = Depends(require_admin)) -> dict:
+    """Masked credential status (never the raw secret values)."""
+    return {"credentials": credentials.status(db)}
+
+
+@router.put("/credentials")
+def update_credentials(
+    body: CredentialsUpdate, db: Session = Depends(get_db), user: User = Depends(require_admin),
+) -> dict:
+    """Save/update credentials. Blank fields keep the existing value.
+
+    This is how the admin rotates the Dhan access token (expires every ~24h)
+    without restarting the server. Values are stored encrypted at rest.
+    """
+    changed = credentials.set_secrets(db, body.model_dump())
+    # Audit only WHICH keys changed, never the values.
+    db.add(AuditLog(actor=user.username, action="credentials_update", detail={"changed": changed}))
+    db.commit()
+    return {"status": "ok", "changed": changed, "credentials": credentials.status(db)}
+
+
+@router.post("/credentials/test/dhan")
+def test_dhan(db: Session = Depends(get_db), _: User = Depends(require_admin)) -> dict:
+    """Live test: is the Dhan API reachable & authorized with current creds?"""
+    resolved = credentials.resolve_config(db)
+    result = DhanClient(resolved).health_check()
+    return {"provider": "dhan", **result}
+
+
+@router.post("/credentials/test/openai")
+def test_openai(db: Session = Depends(get_db), _: User = Depends(require_admin)) -> dict:
+    """Live test: is the OpenAI API reachable & the key/model valid?"""
+    resolved = credentials.resolve_config(db)
+    result = OpenAIResearcher(resolved).test_connection()
+    return {"provider": "openai", **result}
 
 
 @router.get("/audit")

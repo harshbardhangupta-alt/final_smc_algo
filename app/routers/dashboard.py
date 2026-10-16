@@ -11,6 +11,7 @@ from ..database import get_db
 from ..models import ScanRun, Settings, Signal
 from ..providers.dhan import DhanClient
 from ..schemas import DashboardOut, SignalOut
+from ..services.credentials import resolve_config
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -59,7 +60,7 @@ def dashboard(db: Session = Depends(get_db)) -> DashboardOut:
     elif at.get("enabled") and at.get("paper_trading"):
         auto = "ON (paper)"
 
-    broker = DhanClient().health_check()
+    broker = DhanClient(resolve_config(db)).health_check()
     message = None
     if not buys and not sells:
         message = "No qualified trade setups currently available."
