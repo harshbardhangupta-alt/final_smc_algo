@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}NSE SMC Trading System{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">SMC<span class="dot">•</span>NSE <span class="muted">Trading System</span></div>
+    <div class="statbar" id="statbar">
+      <div class="stat"><span class="k">Market</span><span class="v" id="s-market">—</span></div>
+      <div class="stat"><span class="k">Last Scan</span><span class="v" id="s-scan">—</span></div>
+      <div class="stat"><span class="k">BUY setups</span><span class="v dir-buy" id="s-buy">—</span></div>
+      <div class="stat"><span class="k">SELL setups</span><span class="v dir-sell" id="s-sell">—</span></div>
+      <div class="stat"><span class="k">Auto-Trade</span><span class="v" id="s-auto">—</span></div>
+      <div class="stat"><span class="k">Broker</span><span class="v" id="s-broker">—</span></div>
+    </div>
+  </header>
+  <nav class="nav">
+    <a href="/" class="{% if active=='dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/orders" class="{% if active=='orders' %}active{% endif %}">Orders &amp; Positions</a>
+    <a href="/settings" class="{% if active=='settings' %}active{% endif %}">Settings</a>
+  </nav>
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+  <div class="toast" id="toast"></div>
+  <script src="/static/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

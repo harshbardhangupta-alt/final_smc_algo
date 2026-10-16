@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Settings — NSE SMC Trading System{% endblock %}
+{% block content %}
+  <div id="login-box" style="display:none">
+    <div class="card" style="max-width:360px;margin:40px auto">
+      <h3>Admin Login</h3>
+      <div class="field"><label>Username</label><input id="u" value="admin" /></div>
+      <div class="field" style="margin-top:8px"><label>Password</label><input id="p" type="password" /></div>
+      <button class="btn primary" style="margin-top:12px" onclick="doLogin()">Sign in</button>
+      <p class="muted" style="font-size:12px;margin-top:10px">Default credentials are set in <code>.env</code>. Change them immediately.</p>
+    </div>
+  </div>
+
+  <div id="panel" style="display:none">
+    <div class="toolbar">
+      <button class="btn" onclick="runScan()">Run Scan Now</button>
+      <button class="btn" onclick="syncUniverse()">Sync Universe → Dhan IDs</button>
+      <button class="btn danger" onclick="killSwitch(true)">Engage Kill Switch</button>
+      <button class="btn" onclick="killSwitch(false)">Release Kill Switch</button>
+      <button class="btn" onclick="doLogout()" style="margin-left:auto">Logout</button>
+    </div>
+
+    <div id="integrations" class="banner"></div>
+    <div class="banner warn">Live auto-trading and MTF are OFF by default. Enabling LIVE execution
+      (paper trading off) requires <code>live_confirmed: true</code> and is enforced by the backend.</div>
+
+    <div id="groups"></div>
+    <div class="toolbar" style="margin-top:16px">
+      <button class="btn primary" onclick="saveAll()">Save Settings</button>
+      <span id="save-status" class="muted"></span>
+    </div>
+
+    <div class="section-title"><h2>Recent Audit Log</h2></div>
+    <div id="audit"></div>
+  </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const GROUPS = ['universe','capital','auto_trading','scheduling','scoring','policy'];
+let STATE = {};
+
+function inputFor(group, key, val) {
+  const id = 'f_' + group + '_' + key;
+  if (typeof val === 'boolean') {
+    return '<div class="field"><label>' + key + '</label><select id="' + id + '">' +
+      '<option value="true"' + (val ? ' selected' : '') + '>true</option>' +
+      '<option value="false"' + (!val ? ' selected' : '') + '>false</option></select></div>';
+  }
+  if (typeof val === 'object') {
+    return '<div class="field"><label>' + key + ' (JSON)</label>' +
+      '<input id="' + id + '" value=\'' + JSON.stringify(val).replace(/'/g, "&#39;") + '\' /></div>';
+  }
+  return '<div class="field"><label>' + key + '</label><input id="' + id + '" value="' +
+    String(val).replace(/"/g, '&quot;') + '" /></div>';
+}
+
+function readGroup(group, original) {
+  const out = {};
+  for (const key of Object.keys(original)) {
+    const el = document.getElementById('f_' + group + '_' + key);
+    if (!el) continue;
+    let raw = el.value;
+    const orig = original[key];
+    if (typeof orig === 'boolean') out[key] = (raw === 'true');
+    else if (typeof orig === 'number') out[key] = Number(raw);
+    else if (typeof orig === 'object') { try { out[key] = JSON.parse(raw); } catch(e) { out[key] = orig; } }
+    else out[key] = raw;
+  }
+  return out;
+}
+
+function render() {
+  let h = '';
+  for (const g of GROUPS) {
+    const data = STATE[g] || {};
+    h += '<div class="card" style="margin-bottom:14px"><h3>' + g.replace(/_/g,' ') + '</h3><div class="form-grid">';
+    for (const k of Object.keys(data)) h += inputFor(g, k, data[k]);
+    h += '</div></div>';
+  }
+  document.getElementById('groups').innerHTML = h;
+}
+
+async function loadSettings() {
+  const s = await api('/api/settings');
+  if (s && s._unauth) { showLogin(); return; }
+  if (!s) return;
+  document.getElementById('login-box').style.display = 'none';
+  document.getElementById('panel').style.display = 'block';
+  STATE = { universe: s.universe, capital: s.capital, auto_trading: s.auto_trading,
+            scheduling: s.scheduling, scoring: s.scoring, policy: s.policy };
+  const ints = s.integrations || {};
+  document.getElementById('integrations').innerHTML =
+    'Integrations — Dhan: ' + badge(ints.dhan) + ' · OpenAI: ' + badge(ints.openai) + ' · News: ' + badge(ints.news) +
+    ' <span class="muted">(configure keys in .env; secrets never shown here)</span>';
+  render();
+  loadAudit();
+  refreshStatbar();
+}
+function badge(ok){ return ok ? '<span class="pill ok">configured</span>' : '<span class="pill off">not set</span>'; }
+
+function showLogin(){ document.getElementById('login-box').style.display='block'; document.getElementById('panel').style.display='none'; }
+
+async function doLogin() {
+  const r = await api('/api/login', { method:'POST', body: JSON.stringify({ username: val('u'), password: val('p') }) });
+  if (r && r.status === 'ok') { toast('Signed in'); loadSettings(); }
+}
+async function doLogout(){ await api('/api/logout', { method:'POST' }); showLogin(); }
+
+async function saveAll() {
+  const body = {};
+  for (const g of GROUPS) body[g] = readGroup(g, STATE[g] || {});
+  const r = await api('/api/settings', { method:'PUT', body: JSON.stringify(body) });
+  if (r) { document.getElementById('save-status').textContent = 'Saved ' + new Date().toLocaleTimeString(); STATE = {
+    universe:r.universe,capital:r.capital,auto_trading:r.auto_trading,scheduling:r.scheduling,scoring:r.scoring,policy:r.policy}; render(); toast('Settings saved'); }
+}
+
+async function runScan(){ const r = await api('/api/scan', { method:'POST' }); if (r) toast('Scan started'); }
+async function syncUniverse(){ const r = await api('/api/universe/sync', { method:'POST' }); if (r) toast('Universe: ' + r.mapped + '/' + r.total + ' mapped' + (r.scrip_error ? ' (' + r.scrip_error + ')' : '')); }
+async function killSwitch(on){ const r = await api('/api/kill-switch?on=' + on, { method:'POST' }); if (r) { toast('Kill switch ' + (on?'ON':'OFF')); refreshStatbar(); } }
+
+async function loadAudit() {
+  const rows = await api('/api/audit');
+  if (!rows || rows._unauth) return;
+  let h = '<table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Detail</th></tr></thead><tbody>';
+  for (const r of rows) h += '<tr><td>' + fmtTime(r.ts) + '</td><td>' + r.actor + '</td><td>' + r.action +
+    '</td><td class="muted" style="font-size:12px">' + JSON.stringify(r.detail) + '</td></tr>';
+  document.getElementById('audit').innerHTML = h + '</tbody></table>';
+}
+
+function val(id){ return document.getElementById(id).value; }
+loadSettings();
+</script>
+{% endblock %}

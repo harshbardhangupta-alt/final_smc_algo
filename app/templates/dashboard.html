@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — NSE SMC Trading System{% endblock %}
+{% block content %}
+  <div id="message-banner"></div>
+
+  <div class="section-title">
+    <h2 class="dir-buy">BUY Opportunities</h2>
+    <span class="count" id="buy-count"></span>
+  </div>
+  <div id="buy-table"></div>
+
+  <div class="section-title">
+    <h2 class="dir-sell">SELL Opportunities</h2>
+    <span class="count" id="sell-count"></span>
+  </div>
+  <div id="sell-table"></div>
+
+  <p class="muted" style="margin-top:24px;font-size:12px">
+    Levels are computed by the deterministic SMC engine from completed candles. Only fully
+    qualified setups are shown. This is analytical output, not investment advice.
+  </p>
+{% endblock %}
+{% block scripts %}
+<script>
+function levelsTable(rows, dir) {
+  if (!rows.length) {
+    return '<div class="empty">No qualified ' + dir.toUpperCase() + ' setups currently available.</div>';
+  }
+  const entryLabel = dir === 'buy' ? 'Entry / Buy' : 'Entry / Sell';
+  let h = '<table><thead><tr>' +
+    '<th>Stock</th><th class="num">' + entryLabel + '</th><th class="num">Stop Loss</th>' +
+    '<th class="num">TP1</th><th class="num">TP2</th><th class="num">TP3</th>' +
+    '<th class="num">Score</th><th></th></tr></thead><tbody>';
+  for (const s of rows) {
+    const extra = dir === 'sell' && s.sell_trade_type
+      ? ' <span class="pill sell">' + s.sell_trade_type + '</span>' : '';
+    h += '<tr>' +
+      '<td class="sym">' + s.symbol + extra + '</td>' +
+      '<td class="num">' + fmt(s.entry) + '</td>' +
+      '<td class="num">' + fmt(s.stop_loss) + '</td>' +
+      '<td class="num">' + fmt(s.tp1) + '</td>' +
+      '<td class="num">' + fmt(s.tp2) + '</td>' +
+      '<td class="num">' + fmt(s.tp3) + '</td>' +
+      '<td class="num score">' + Math.round(s.quality_score) + '</td>' +
+      '<td><a class="btn" href="/stock/' + s.id + '">View</a></td>' +
+      '</tr>';
+  }
+  return h + '</tbody></table>';
+}
+
+async function loadDashboard() {
+  const d = await api('/api/dashboard');
+  if (!d) return;
+  updateStatbar(d);
+  document.getElementById('buy-count').textContent = d.qualified_buy + ' qualified';
+  document.getElementById('sell-count').textContent = d.qualified_sell + ' qualified';
+  document.getElementById('buy-table').innerHTML = levelsTable(d.buys, 'buy');
+  document.getElementById('sell-table').innerHTML = levelsTable(d.sells, 'sell');
+  const banner = document.getElementById('message-banner');
+  banner.innerHTML = (d.buys.length || d.sells.length) ? '' :
+    '<div class="banner warn">' + (d.message || 'No qualified trade setups currently available.') + '</div>';
+}
+loadDashboard();
+setInterval(loadDashboard, 60000);
+</script>
+{% endblock %}

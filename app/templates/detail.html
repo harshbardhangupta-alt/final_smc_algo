@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Stock Detail — NSE SMC Trading System{% endblock %}
+{% block content %}
+  <div class="toolbar">
+    <a class="btn" href="/">← Back to dashboard</a>
+    <span id="hdr" class="muted"></span>
+  </div>
+  <div id="detail"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SIGNAL_ID = {{ signal_id }};
+
+function kv(k, v) { return '<div class="kv"><span class="k">' + k + '</span><span>' + v + '</span></div>'; }
+function pill(cls, txt) { return '<span class="pill ' + cls + '">' + txt + '</span>'; }
+
+async function load() {
+  const s = await api('/api/signals/' + SIGNAL_ID);
+  if (!s) return;
+  const dir = s.direction === 'buy' ? pill('buy', 'BUY') : pill('sell', 'SELL');
+  document.getElementById('hdr').innerHTML = '';
+  const a = s.news.assessment || {};
+  const warnings = (s.warnings || []).map(w => '<li>' + w + '</li>').join('') || '<li class="muted">none</li>';
+  const reasons = (s.rejection_reasons || []).map(w => '<li>' + w + '</li>').join('') || '<li class="muted">none</li>';
+  const points = (a.key_points || []).map(w => '<li>' + w + '</li>').join('') || '<li class="muted">none</li>';
+  const brk = s.score_breakdown || {};
+  const brkRows = Object.keys(brk).map(k => kv(k.replace(/_/g, ' '), brk[k])).join('');
+  const tech = s.technical || {};
+  const zone = tech.zone ? (tech.zone.kind + ' ' + fmt(tech.zone.bottom) + '–' + fmt(tech.zone.top) +
+    (tech.zone.fresh ? ' (fresh)' : ' (' + tech.zone.retests + ' retests)')) : '—';
+
+  document.getElementById('detail').innerHTML =
+    '<h1 style="margin:4px 0 2px">' + s.symbol + ' ' + dir +
+      ' <span class="score">' + Math.round(s.quality_score) + '</span><span class="muted" style="font-size:13px">/100 · ' + s.verdict + '</span></h1>' +
+    '<p class="muted" style="margin-top:0">Signal #' + s.id + ' · created ' + fmtTime(s.created_at) +
+      ' · expires ' + fmtTime(s.expires_at) + '</p>' +
+    '<div class="cards">' +
+      '<div class="card"><h3>Trade Levels</h3>' +
+        kv(s.direction === 'buy' ? 'Entry / Buy' : 'Entry / Sell', fmt(s.entry)) +
+        kv('Stop Loss', fmt(s.stop_loss)) + kv('TP1', fmt(s.tp1)) + kv('TP2', fmt(s.tp2)) +
+        kv('TP3', fmt(s.tp3)) + kv('Reward : Risk', s.reward_risk + ' : 1') +
+        (s.sell_trade_type ? kv('Sell trade type', s.sell_trade_type) : '') +
+      '</div>' +
+      '<div class="card"><h3>Position & Risk</h3>' +
+        kv('Quantity', s.quantity) + kv('Capital', '₹' + fmt(s.capital_required)) +
+        kv('Risk amount', '₹' + fmt(s.risk_amount)) + kv('Product', s.product) +
+      '</div>' +
+      '<div class="card"><h3>Technical Structure</h3>' +
+        kv('Daily trend', tech.trend_daily || '—') + kv('Weekly trend', tech.trend_weekly || '—') +
+        kv('Entry model', tech.entry_model || '—') + kv('SMC zone', zone) +
+      '</div>' +
+      '<div class="card"><h3>Score Breakdown</h3>' + brkRows + '</div>' +
+      '<div class="card"><h3>News & AI Assessment</h3>' +
+        kv('AI available', a.available ? 'yes' : 'no') +
+        kv('Sentiment', a.sentiment || '—') + kv('Thesis', a.thesis_support || '—') +
+        kv('Confidence', a.confidence != null ? a.confidence : '—') +
+        kv('Material negative', a.material_negative ? pill('bad','yes') : 'no') +
+        kv('Critical', a.critical_flag ? pill('bad','yes') : 'no') +
+        kv('News checked', fmtTime(s.news.checked_at)) +
+        '<p class="muted" style="margin:8px 0 2px">' + (a.summary || 'No AI summary available.') + '</p>' +
+        '<ul class="list">' + points + '</ul>' +
+      '</div>' +
+      '<div class="card"><h3>Fundamentals</h3>' +
+        kv('Available', s.fundamental.ok ? 'yes' : 'no') +
+        kv('Source', s.fundamental.source || '—') + kv('Period', s.fundamental.period || '—') +
+        (s.fundamental.error ? '<p class="muted">' + s.fundamental.error + '</p>' : '') +
+      '</div>' +
+      '<div class="card"><h3>Data Freshness & Provenance</h3>' +
+        kv('Latest candle', fmtTime(s.provenance.latest_candle)) +
+        kv('Scanned at', fmtTime(s.provenance.scanned_at)) +
+        kv('OpenAI model', s.provenance.openai_model || '—') +
+        kv('Config version', s.provenance.config_version) +
+      '</div>' +
+      '<div class="card"><h3>Risk Alerts & Warnings</h3><ul class="list">' + warnings + '</ul>' +
+        '<h3 style="margin-top:12px">Exclusion reasons</h3><ul class="list">' + reasons + '</ul>' +
+      '</div>' +
+    '</div>';
+}
+load();
+</script>
+{% endblock %}
