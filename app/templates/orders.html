@@ -3,7 +3,7 @@
 {% block content %}
   <div class="toolbar">
     <button class="btn" onclick="reconcile()">Reconcile with Broker</button>
-    <span class="muted">Paper orders are clearly flagged. Live orders require admin + confirmation.</span>
+    <span class="muted">Paper orders are clearly flagged. Live orders require explicit confirmation in Settings.</span>
   </div>
 
   <div class="section-title"><h2>Open & Recent Orders</h2></div>
@@ -54,7 +54,6 @@ async function loadPositions() {
 
 async function reconcile() {
   const r = await api('/api/orders/reconcile', { method:'POST' });
-  if (r && r._unauth) { toast('Admin login required (Settings)'); return; }
   if (r) { toast(r.offline ? 'Broker offline' : ('Reconciled ' + r.reconciled)); loadOrders(); }
 }
 

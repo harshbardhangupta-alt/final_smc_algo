@@ -1,4 +1,8 @@
-"""API-level tests: health, auth gating, settings persistence, dashboard, safety."""
+"""API-level tests: health, open settings, persistence, dashboard, safety.
+
+Authentication has been removed, so settings/credentials/scan/order endpoints
+are open. These tests assert the endpoints work without any login.
+"""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,12 +14,6 @@ from app.main import app
 def client():
     with TestClient(app) as c:
         yield c
-
-
-def _login(client):
-    r = client.post("/api/login", json={"username": "admin", "password": "pw123"})
-    assert r.status_code == 200
-    return r
 
 
 def test_health(client):
@@ -34,13 +32,13 @@ def test_dashboard_offline_shows_no_setups(client):
     assert body["message"] == "No qualified trade setups currently available."
 
 
-def test_settings_requires_auth(client):
-    assert client.get("/api/settings").status_code == 401
-    assert client.put("/api/settings", json={"capital": {}}).status_code == 401
+def test_no_login_endpoints(client):
+    # Login/logout were removed entirely.
+    assert client.post("/api/login", json={"username": "x", "password": "y"}).status_code == 404
+    assert client.post("/api/logout").status_code == 404
 
 
-def test_login_and_get_settings(client):
-    _login(client)
+def test_settings_open_without_auth(client):
     r = client.get("/api/settings")
     assert r.status_code == 200
     body = r.json()
@@ -52,14 +50,12 @@ def test_login_and_get_settings(client):
 
 
 def test_settings_persist_after_update(client):
-    _login(client)
     r = client.put("/api/settings", json={"capital": {"total_capital": 2_500_000.0}})
     assert r.status_code == 200
     assert client.get("/api/settings").json()["capital"]["total_capital"] == 2_500_000.0
 
 
 def test_enable_live_requires_confirmation(client):
-    _login(client)
     r = client.put("/api/settings", json={"auto_trading": {"enabled": True, "paper_trading": False}})
     assert r.status_code == 400
     assert "live_confirmed" in r.json()["detail"]
@@ -69,9 +65,7 @@ def test_enable_live_requires_confirmation(client):
     assert r2.status_code == 200
 
 
-def test_kill_switch_requires_admin(client):
-    assert client.post("/api/kill-switch?on=true").status_code == 401
-    _login(client)
+def test_kill_switch_open(client):
     r = client.post("/api/kill-switch?on=true")
     assert r.status_code == 200 and r.json()["kill_switch"] is True
 

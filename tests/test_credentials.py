@@ -52,18 +52,13 @@ def client():
         yield c
 
 
-def _login(client):
-    assert client.post("/api/login", json={"username": "admin", "password": "pw123"}).status_code == 200
-
-
-def test_credentials_endpoints_require_admin(client):
-    assert client.get("/api/credentials").status_code == 401
-    assert client.put("/api/credentials", json={"dhan_client_id": "x"}).status_code == 401
-    assert client.post("/api/credentials/test/dhan").status_code == 401
+def test_credentials_endpoints_open(client):
+    # Auth was removed: these endpoints are reachable without a login.
+    assert client.get("/api/credentials").status_code == 200
+    assert client.post("/api/credentials/test/dhan").status_code == 200
 
 
 def test_update_and_mask_via_api(client):
-    _login(client)
     r = client.put("/api/credentials", json={"dhan_access_token": "tok-999988887777"})
     assert r.status_code == 200 and "dhan_access_token" in r.json()["changed"]
     status = client.get("/api/credentials").json()["credentials"]
@@ -74,7 +69,6 @@ def test_update_and_mask_via_api(client):
 
 
 def test_test_connection_reports_not_configured_when_empty(client):
-    _login(client)
     # Clear any stored creds so the test reflects an unconfigured provider.
     client.put("/api/credentials", json={"dhan_access_token": "__clear__",
                                          "dhan_client_id": "__clear__"})
@@ -83,6 +77,5 @@ def test_test_connection_reports_not_configured_when_empty(client):
 
 
 def test_openai_test_endpoint_shape(client):
-    _login(client)
     r = client.post("/api/credentials/test/openai").json()
     assert r["provider"] == "openai" and "ok" in r

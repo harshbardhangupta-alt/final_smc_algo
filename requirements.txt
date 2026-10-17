@@ -18,9 +18,6 @@ httpx>=0.27
 # Scheduling of scans
 APScheduler>=3.10,<4
 
-# Auth (password hashing for backend controls)
-bcrypt>=4.1
-
 # Encryption at rest for admin-managed API credentials (Fernet)
 cryptography>=42.0
 

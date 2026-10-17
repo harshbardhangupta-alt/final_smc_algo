@@ -18,8 +18,6 @@ _TMPDIR = tempfile.mkdtemp(prefix="smc_test_")
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TMPDIR}/test.db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("SCHEDULER_ENABLED", "false")
-os.environ.setdefault("ADMIN_USERNAME", "admin")
-os.environ.setdefault("ADMIN_PASSWORD", "pw123")
 
 from app.core.candles import Candle  # noqa: E402
 
@@ -68,13 +66,11 @@ def db_session():
     """Fresh DB session with tables created and defaults seeded."""
     from app.database import SessionLocal, engine, Base
     from app.models import Settings
-    from app.security import ensure_admin_user
     from app.settings_defaults import default_settings
 
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    ensure_admin_user(db)
     if db.get(Settings, 1) is None:
         db.add(Settings(id=1, **default_settings()))
         db.commit()

@@ -21,7 +21,6 @@ from .database import SessionLocal, init_db
 from .logging_config import configure_logging
 from .models import Settings
 from .routers import dashboard, health, orders, scan, settings as settings_router, stocks
-from .security import ensure_admin_user
 from .services.scheduler import shutdown_scheduler, start_scheduler
 from .settings_defaults import default_settings
 
@@ -35,7 +34,6 @@ def _seed() -> None:
     init_db()
     db = SessionLocal()
     try:
-        ensure_admin_user(db)
         if db.get(Settings, 1) is None:
             db.add(Settings(id=1, **default_settings()))
             db.commit()

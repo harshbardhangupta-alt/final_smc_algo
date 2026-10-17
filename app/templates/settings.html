@@ -1,23 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Settings — NSE SMC Trading System{% endblock %}
 {% block content %}
-  <div id="login-box" style="display:none">
-    <div class="card" style="max-width:360px;margin:40px auto">
-      <h3>Admin Login</h3>
-      <div class="field"><label>Username</label><input id="u" value="admin" /></div>
-      <div class="field" style="margin-top:8px"><label>Password</label><input id="p" type="password" /></div>
-      <button class="btn primary" style="margin-top:12px" onclick="doLogin()">Sign in</button>
-      <p class="muted" style="font-size:12px;margin-top:10px">Default credentials are set in <code>.env</code>. Change them immediately.</p>
-    </div>
-  </div>
-
-  <div id="panel" style="display:none">
+  <div id="panel">
     <div class="toolbar">
       <button class="btn" onclick="runScan()">Run Scan Now</button>
       <button class="btn" onclick="syncUniverse()">Sync Universe → Dhan IDs</button>
       <button class="btn danger" onclick="killSwitch(true)">Engage Kill Switch</button>
       <button class="btn" onclick="killSwitch(false)">Release Kill Switch</button>
-      <button class="btn" onclick="doLogout()" style="margin-left:auto">Logout</button>
     </div>
 
     <div id="integrations" class="banner"></div>
@@ -121,16 +110,13 @@ function render() {
 
 async function loadSettings() {
   const s = await api('/api/settings');
-  if (s && s._unauth) { showLogin(); return; }
   if (!s) return;
-  document.getElementById('login-box').style.display = 'none';
-  document.getElementById('panel').style.display = 'block';
   STATE = { universe: s.universe, capital: s.capital, auto_trading: s.auto_trading,
             scheduling: s.scheduling, scoring: s.scoring, policy: s.policy };
   const ints = s.integrations || {};
   document.getElementById('integrations').innerHTML =
     'Integrations — Dhan: ' + badge(ints.dhan) + ' · OpenAI: ' + badge(ints.openai) + ' · News: ' + badge(ints.news) +
-    ' <span class="muted">(configure keys in .env; secrets never shown here)</span>';
+    ' <span class="muted">(enter keys below or in .env; secrets never shown here)</span>';
   render();
   loadCredentials();
   loadAudit();
@@ -203,14 +189,6 @@ async function testOpenAI() {
   if (r && !r._unauth) showTest('test-openai', 'OpenAI', r);
 }
 
-function showLogin(){ document.getElementById('login-box').style.display='block'; document.getElementById('panel').style.display='none'; }
-
-async function doLogin() {
-  const r = await api('/api/login', { method:'POST', body: JSON.stringify({ username: val('u'), password: val('p') }) });
-  if (r && r.status === 'ok') { toast('Signed in'); loadSettings(); }
-}
-async function doLogout(){ await api('/api/logout', { method:'POST' }); showLogin(); }
-
 async function saveAll() {
   const body = {};
   for (const g of GROUPS) body[g] = readGroup(g, STATE[g] || {});
@@ -232,7 +210,6 @@ async function loadAudit() {
   document.getElementById('audit').innerHTML = h + '</tbody></table>';
 }
 
-function val(id){ return document.getElementById(id).value; }
 loadSettings();
 </script>
 {% endblock %}

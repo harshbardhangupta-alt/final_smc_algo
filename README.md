@@ -102,8 +102,8 @@ uvicorn app.main:app --reload
 
 You can supply API credentials **two ways**, and the in-app option takes precedence:
 
-1. **From the website (recommended)** — open **Settings → API Credentials & Connections**,
-   sign in as admin, and enter your **Dhan Client ID** (fixed), **Dhan Access Token**
+1. **From the website (recommended)** — open **Settings → API Credentials & Connections**
+   and enter your **Dhan Client ID** (fixed), **Dhan Access Token**
    (rotate here whenever it expires — Dhan expires it every ~24h, no restart needed),
    **OpenAI API Key** (fixed) and optional **OpenAI model** / **News API key**. Values are
    **encrypted at rest** (Fernet, keyed from `SECRET_KEY`) and are never shown again in
@@ -120,9 +120,8 @@ Important `.env` keys (see `.env.example` for all):
 
 | Key | Purpose |
 |---|---|
-| `SECRET_KEY` | Signs admin session cookies — set a long random value |
+| `SECRET_KEY` | Encrypts stored API credentials at rest — set a long random value |
 | `DATABASE_URL` | `sqlite:///./data/app.db` (dev) or `postgresql+psycopg://…` (prod) |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Bootstrap admin for the control panel |
 | `DHAN_CLIENT_ID` / `DHAN_ACCESS_TOKEN` | DhanHQ v2 credentials (blank ⇒ offline) |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI research (blank ⇒ AI disabled) |
 | `NEWS_API_KEY` | Licensed news API (blank ⇒ fail-closed on news) |
@@ -150,7 +149,7 @@ by design: the system never simulates a live connection or invents prices.
    *live* execution (paper trading off) requires `live_confirmed: true`, enforced by
    the backend. The **kill switch** blocks all new orders instantly.
 5. **Orders & Positions** monitors open/filled orders (paper vs live clearly flagged)
-   and lets an admin reconcile with the broker.
+   and lets you reconcile with the broker.
 
 ### Capital allocation & MTF
 
@@ -186,7 +185,7 @@ The suite (61 tests) covers the critical logic the system depends on:
 - Scanner pipeline: offline publishes nothing; qualified candidate published with sizing
 - Auto-trading OFF by default, kill switch, duplicate prevention, expiry, slippage,
   live-confirmation requirement
-- API: auth gating, settings persistence, secrets never exposed
+- API: open settings endpoints, settings persistence, secrets never exposed
 
 > Test output is real — run `pytest` to reproduce. No fabricated prices are ever used
 > as live market data.
@@ -194,6 +193,12 @@ The suite (61 tests) covers the critical logic the system depends on:
 ---
 
 ## Safety & disclaimer
+
+> **No authentication:** login was removed by request. Every endpoint — including
+> settings, API credentials and order execution — is open to anyone who can reach
+> the server. Run it only on `127.0.0.1` or a trusted private network, never exposed
+> directly to the public internet. Credentials are still encrypted at rest and never
+> returned to the browser in plaintext.
 
 This software assists analysis and optional authorized execution. It makes **no**
 promise of profit, win rate or guaranteed returns, and the quality score is **not** a

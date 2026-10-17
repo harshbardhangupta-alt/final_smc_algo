@@ -8,11 +8,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
 class SignalOut(BaseModel):
     id: int
     symbol: str

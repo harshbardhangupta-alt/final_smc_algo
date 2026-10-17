@@ -25,10 +25,6 @@ class Config(BaseSettings):
     # Database
     database_url: str = "sqlite:///./data/app.db"
 
-    # Admin bootstrap
-    admin_username: str = "admin"
-    admin_password: str = "admin"
-
     # Dhan
     dhan_client_id: str = ""
     dhan_access_token: str = ""
